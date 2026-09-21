@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Solvabilité II — Règlement 2015/35</title>
+<script src="d3.min.js"></script>
+<style>
+:root {
+  --bg: #0d1117; --surface: #161b22; --border: #30363d;
+  --text: #e6edf3; --muted: #8b949e; --accent: #388bfd;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--bg); color: var(--text);
+  font-family: system-ui, sans-serif; font-size: 13px;
+  height: 100vh; display: flex; flex-direction: column; overflow: hidden;
+}
+header {
+  padding: 10px 20px; border-bottom: 1px solid var(--border);
+  background: var(--surface); display: flex; align-items: center; gap: 16px;
+}
+header h1 { font-size: 13px; font-weight: 600; }
+header span { color: var(--muted); font-size: 11px; }
+.toolbar {
+  padding: 8px 20px; border-bottom: 1px solid var(--border);
+  display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+}
+.chip {
+  padding: 3px 10px; border-radius: 20px; border: 1px solid var(--border);
+  background: transparent; color: var(--muted); font-size: 11px;
+  cursor: pointer; font-family: inherit;
+}
+.chip.active { background: var(--c, #388bfd); color: #0d1117; border-color: transparent; font-weight: 600; }
+.chip:disabled { cursor: wait; opacity: .55; }
+.main { display: flex; flex: 1; min-height: 0; overflow: hidden; }
+#article-list {
+  width: 260px; flex: 0 0 260px; border-right: 1px solid var(--border);
+  background: var(--surface); overflow-y: auto;
+  display: none;
+}
+.list-head { padding: 12px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--surface); z-index: 1; }
+.search { width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 5px; background: var(--bg); color: var(--text); font: inherit; }
+.article-list-item { display: block; width: 100%; padding: 9px 12px; border: 0; border-bottom: 1px solid #21262d; background: transparent; color: var(--muted); text-align: left; cursor: pointer; font: inherit; }
+.article-list-item:hover, .article-list-item.active { background: #21262d; color: var(--text); }
+.article-list-item.active { box-shadow: inset 3px 0 var(--accent); }
+.list-number { color: var(--accent); font-weight: 700; margin-right: 6px; }
+.list-title { font-size: 12px; }
+#reader { flex: 1; min-width: 0; overflow-y: auto; background: var(--bg); display: none; }
+.reader-inner { max-width: 900px; margin: 0 auto; padding: 28px 36px 60px; }
+.reader-kicker { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; }
+.reader-title { margin: 5px 0 8px; font-size: 26px; line-height: 1.2; }
+.reader-meta { color: var(--muted); font-size: 12px; margin-bottom: 22px; }
+.legal-text { max-width: 760px; font-family: Georgia, "Times New Roman", serif; font-size: 16px; line-height: 1.7; }
+.legal-item { margin: 0 0 14px; }
+.legal-marker { display: inline-block; min-width: 42px; color: var(--accent); font-weight: 700; font-family: system-ui, sans-serif; font-size: 13px; vertical-align: top; }
+.legal-copy { display: inline; }
+.legal-empty { color: var(--muted); }
+#side-panel { width: 500px; flex: 0 0 500px; border-left: 1px solid var(--border); background: var(--surface); overflow-y: auto; }
+.side-section { padding: 14px 16px; border-bottom: 1px solid var(--border); }
+.panel-header {
+  padding: 12px 16px; border-bottom: 1px solid var(--border);
+  font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em;
+}
+.panel-body { padding: 16px; font-size: 12px; line-height: 1.6; }
+.panel-empty { color: var(--muted); }
+.art-num { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+.art-titre { margin-bottom: 10px; }
+.article-text { margin: 6px 0 14px; padding: 10px; border: 1px solid var(--border); background: #0d1117; color: var(--text); font: inherit; font-size: 12px; line-height: 1.65; white-space: pre-wrap; overflow-wrap: anywhere; }
+.badge {
+  display: inline-block; padding: 2px 8px; border-radius: 12px;
+  font-size: 10px; font-weight: 600; margin-bottom: 12px; color: #0d1117;
+}
+.meta { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid var(--border); }
+.meta:last-of-type { border-bottom: none; }
+.mk { color: var(--muted); font-size: 11px; }
+.mv { color: var(--text); font-size: 11px; text-align: right; }
+.stitle { font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 12px 0 4px; }
+.etag {
+  display: inline-block; padding: 2px 6px; border: 1px solid var(--border);
+  border-radius: 4px; font-size: 10px; color: var(--muted); margin: 2px 2px 2px 0;
+}
+.ritem { padding: 4px 0; border-bottom: 1px solid var(--border); font-size: 11px; color: var(--muted); }
+.ritem:last-child { border-bottom: none; }
+.rcible { color: var(--accent); }
+.legend {
+  padding: 10px 16px; border-top: 1px solid var(--border);
+  display: flex; flex-wrap: wrap; gap: 6px;
+}
+.li { display: flex; align-items: center; gap: 5px; font-size: 10px; color: var(--muted); }
+.ld { width: 8px; height: 8px; border-radius: 50%; }
+.stats {
+  padding: 5px 20px; border-top: 1px solid var(--border);
+  background: var(--surface); font-size: 10px; color: var(--muted);
+  display: flex; gap: 16px;
+}
+.stats strong { color: var(--text); }
+.node circle { cursor: pointer; stroke-width: 1.5; }
+.node circle:hover { stroke-width: 3; }
+.node.selected circle { stroke: #ffffff; stroke-width: 3; }
+.link { fill: none; stroke: #30363d; stroke-width: 1; stroke-opacity: 0.6; marker-end: url(#arrow); }
+body.view-graph #article-list, body.view-graph #reader { display: none; }
+body.view-graph #side-panel, body.view-reader #article-list, body.view-reader #reader { display: block; }
+body.view-graph #graph { display: block; flex: 1; }
+body.view-reader #graph { display: none; }
+#graph { display: none; flex: 1; min-width: 0; overflow: hidden; position: relative; }
+.panel-article-text { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); }
+.panel-article-text .legal-text { font-family: Georgia, "Times New Roman", serif; font-size: 14px; line-height: 1.6; }
+svg { width: 100%; height: 100%; }
+@media (max-width: 1050px) {
+  #article-list { width: 220px; flex-basis: 220px; }
+  #side-panel { width: 420px; flex-basis: 420px; }
+  .reader-inner { padding: 24px; }
+}
+@media (max-width: 760px) {
+  body { overflow: auto; height: auto; min-height: 100vh; }
+  .main { min-height: calc(100vh - 110px); flex-wrap: wrap; overflow: visible; }
+  #article-list { width: 100%; flex-basis: 100%; max-height: 190px; border-right: 0; border-bottom: 1px solid var(--border); }
+  #reader { min-height: 55vh; order: 2; }
+  #side-panel { width: 100%; flex-basis: 100%; order: 3; border-left: 0; border-top: 1px solid var(--border); }
+  .reader-inner { padding: 22px 18px 40px; }
+  .reader-title { font-size: 22px; }
+}
+</style>
+</head>
+<body class="view-graph">
+
+<header>
+  <h1>Règlement délégué (UE) 2015/35 — Solvabilité II</h1>
+  <span id="hcount">Chargement…</span>
+</header>
+
+<div class="toolbar" id="toolbar">
+  <span style="color:var(--muted);font-size:11px">Filtrer :</span>
+  <button class="chip" id="reader-view-button">Lecture</button>
+  <button class="chip active" id="graph-view-button">Relations</button>
+</div>
+
+<div class="main">
+  <aside id="article-list">
+    <div class="list-head">
+      <input class="search" id="article-search" type="search" placeholder="Rechercher un article…" aria-label="Rechercher un article">
+    </div>
+    <div id="article-list-items"></div>
+  </aside>
+  <section id="reader" aria-label="Lecteur juridique">
+    <div class="reader-inner" id="reader-content"><p class="panel-empty">Sélectionnez un article.</p></div>
+  </section>
+  <aside id="side-panel">
+    <div class="panel-header">Annotations</div>
+    <div class="panel-body" id="pbody"><p class="panel-empty">Sélectionnez un article.</p></div>
+    <div class="legend" id="legend"></div>
+  </aside>
+  <div id="graph"><svg id="svg"><defs><marker id="arrow" markerWidth="6" markerHeight="6" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L6,3 z" fill="#30363d"/></marker></defs></svg></div>
+</div>
+
+<div class="stats">
+  <span>Nœuds : <strong id="sn">—</strong></span>
+  <span>Arêtes : <strong id="se">—</strong></span>
+  <span id="sf"></span>
+</div>
+
+<script>
+// ← CHEMIN VERS TON JSON
+const JSON_PATH = "reglement_delegue_2015_35_annotations_reclassifie.json";
+
+const NATURES = {
+  "calcul_capital_risques":              { label: "Calcul capital",      color: "#1f6feb" },
+  "reporting_publication_transparence":  { label: "Reporting",           color: "#3fb950" },
+  "gouvernance_gestion_risques":         { label: "Gouvernance",         color: "#d29922" },
+  "supervision_decision_mesure":         { label: "Supervision",         color: "#f85149" },
+  "definition_portee_classement":        { label: "Définition",          color: "#bc8cff" },
+  "valorisation_provisions":             { label: "Valorisation",        color: "#39d353" },
+  "donnees_modeles_validation":          { label: "Données / Modèles",   color: "#e3b341" },
+  "solvabilite_groupes":                 { label: "Solvabilité groupes", color: "#58a6ff" },
+  "transfert_attenuation_risques":       { label: "Transfert risques",   color: "#ff7b72" }
+};
+
+const PER = { annuelle:"Annuelle", trimestrielle:"Trimestrielle", continue:"Continue", ad_hoc:"Ad hoc", non_applicable:"—" };
+
+let DATA, simulation, activeFilter = "all", selectedArticle = null, currentArticles = [];
+
+function color(nature) { return (NATURES[nature] || { color: "#888" }).color; }
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+function dispositionHtml(disposition) {
+  const children = (disposition.enfants || []).map(dispositionHtml).join("");
+  return `<div class="legal-item"><span class="legal-marker">${escapeHtml(disposition.marqueur || "")}</span><span class="legal-copy">${escapeHtml(disposition.texte || "")}</span>${children}</div>`;
+}
+
+function articleTextHtml(article) {
+  const structured = (article.dispositions || []).map(dispositionHtml).join("");
+  return structured || `<p class="legal-empty">${escapeHtml(article.texte_brut || "Texte indisponible.")}</p>`;
+}
+
+function renderArticleList(articles) {
+  const container = document.getElementById("article-list-items");
+  container.innerHTML = articles.map(article => `
+    <button class="article-list-item${selectedArticle?.numero === article.numero ? " active" : ""}" data-article="${article.numero}">
+      <span class="list-number">${article.numero}</span><span class="list-title">${escapeHtml(article.titre)}</span>
+    </button>
+  `).join("") || `<p class="panel-empty" style="padding:16px">Aucun article trouvé.</p>`;
+  container.querySelectorAll(".article-list-item").forEach(button => {
+    button.addEventListener("click", () => selectArticle(Number(button.dataset.article)));
+  });
+}
+
+function renderReader(article) {
+  document.getElementById("reader-content").innerHTML = `
+    <div class="reader-kicker">Article ${escapeHtml(article.numero)} · ${escapeHtml(article.libelle_original || "")}</div>
+    <h2 class="reader-title">${escapeHtml(article.titre)}</h2>
+    <div class="reader-meta">${escapeHtml(article.position?.titre ? `Titre ${article.position.titre}` : "")}${article.position?.chapitre ? ` · Chapitre ${escapeHtml(article.position.chapitre)}` : ""}${article.position?.section ? ` · Section ${escapeHtml(article.position.section)}` : ""}</div>
+    <div class="legal-text">${articleTextHtml(article)}</div>
+  `;
+}
+
+function buildLegend() {
+  const leg = document.getElementById("legend");
+  leg.innerHTML = Object.entries(NATURES).map(([k, v]) =>
+    `<div class="li"><div class="ld" style="background:${v.color}"></div>${v.label}</div>`
+  ).join("");
+}
+
+function selectArticle(numero) {
+  const article = DATA.articles.find(item => item.numero === numero);
+  if (!article) return;
+  selectedArticle = article;
+  renderArticleList(currentArticles);
+  renderReader(article);
+  showPanel(article);
+}
+
+function buildFilters() {
+  const tb = document.getElementById("toolbar");
+  const btn = (nature, label) => {
+    const b = document.createElement("button");
+    b.className = "chip" + (nature === "all" ? " active" : "");
+    b.dataset.nature = nature;
+    b.style.setProperty("--c", nature === "all" ? "#388bfd" : color(nature));
+    b.disabled = true;
+    b.textContent = label;
+    b.addEventListener("click", () => {
+      setView("graph");
+      document.querySelectorAll(".chip[data-nature]").forEach(c => c.classList.remove("active"));
+      b.classList.add("active");
+      activeFilter = nature;
+      render(nature === "all" ? DATA.articles : DATA.articles.filter(a => a.annotations.nature === nature));
+    });
+    tb.appendChild(b);
+  };
+  btn("all", "Tous");
+  Object.entries(NATURES).forEach(([k, v]) => btn(k, v.label));
+}
+
+function setFiltersEnabled(enabled) {
+  document.querySelectorAll(".chip[data-nature]").forEach(button => { button.disabled = !enabled; });
+}
+
+function showPanel(a) {
+  d3.selectAll("#svg g.node").classed("selected", d => d.id === a.numero);
+  const c = color(a.annotations.nature);
+  const nat = NATURES[a.annotations.nature] || { label: a.annotations.nature };
+  const pos = a.position;
+  const posStr = [
+    pos.titre        ? `Titre ${pos.titre}`       : null,
+    pos.chapitre     ? `Chap. ${pos.chapitre}`    : null,
+    pos.section      ? `Sect. ${pos.section}`     : null,
+    pos.sous_section ? `S-s. ${pos.sous_section}` : null
+  ].filter(Boolean).join(" › ");
+
+  const entites = (a.annotations.entites_impliquees || [])
+    .map(e => `<span class="etag">${e.replace(/_/g," ")}</span>`).join("")
+    || `<span style="color:var(--muted)">—</span>`;
+
+  const refs = a.annotations.references_croisees || [];
+  const refsHtml = refs.length === 0
+    ? `<p style="color:var(--muted);font-size:11px">Aucune</p>`
+    : refs.map(r => `<div class="ritem"><span class="rcible">${escapeHtml(r.texte_reference)}</span> <span style="font-size:10px">[${escapeHtml(r.type.replace(/_/g," "))}]</span></div>`).join("");
+
+  document.getElementById("pbody").innerHTML = `
+    <div class="art-num">Article ${escapeHtml(a.numero)}</div>
+    <div class="art-titre">${escapeHtml(a.titre)}</div>
+    <span class="badge" style="background:${c}">${nat.label}</span>
+    <div class="panel-article-text">
+      <div class="stitle">Texte de l'article</div>
+      <div class="legal-text">${articleTextHtml(a)}</div>
+    </div>
+    <div class="meta"><span class="mk">Position</span><span class="mv">${posStr||"—"}</span></div>
+    <div class="meta"><span class="mk">Périodicité</span><span class="mv">${PER[a.annotations.periodicite?.valeur]||"—"}</span></div>
+    <div class="meta"><span class="mk">Ambiguïté</span><span class="mv">${a.annotations.ambiguite?"⚠ oui":"non"}</span></div>
+    <div class="stitle">Entités</div><div>${entites}</div>
+    <div class="stitle">Références croisées (${refs.length})</div>${refsHtml}
+  `;
+}
+
+function render(articles) {
+  currentArticles = articles;
+  renderArticleList(articles);
+  if (!selectedArticle || !articles.some(article => article.numero === selectedArticle.numero)) {
+    selectedArticle = articles[0] || null;
+  }
+  if (selectedArticle) {
+    renderReader(selectedArticle);
+    showPanel(selectedArticle);
+  }
+  document.getElementById("sf").textContent =
+    activeFilter === "all" ? "" : `· ${NATURES[activeFilter]?.label} (${articles.length})`;
+
+  const svg = d3.select("#svg");
+  svg.selectAll("g").remove();
+
+  const W = document.getElementById("graph").clientWidth;
+  const H = document.getElementById("graph").clientHeight;
+
+  const artMap = new Map(articles.map(a => [a.numero, a]));
+
+  const nodes = articles.map(a => ({ id: a.numero, data: a }));
+  const links = [];
+  const linkSet = new Set();
+  articles.forEach(a => {
+    (a.annotations.references_croisees || []).forEach(r => {
+      if (r.type === "article_interne" && r.cible?.article && artMap.has(r.cible.article)) {
+        const key = `${a.numero}-${r.cible.article}`;
+        if (!linkSet.has(key)) { linkSet.add(key); links.push({ source: a.numero, target: r.cible.article }); }
+      }
+    });
+  });
+
+  document.getElementById("sn").textContent = nodes.length;
+  document.getElementById("se").textContent = links.length;
+
+  const g = svg.append("g");
+
+  svg.call(d3.zoom().scaleExtent([0.1, 4]).on("zoom", e => g.attr("transform", e.transform)));
+
+  const link = g.append("g").selectAll("line")
+    .data(links).join("line")
+    .attr("class", "link");
+
+  const node = g.append("g").selectAll("g")
+    .data(nodes).join("g").attr("class", "node")
+    .call(d3.drag()
+      .on("start", (e, d) => { if (!e.active) simulation.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; })
+      .on("drag",  (e, d) => { d.fx = e.x; d.fy = e.y; })
+      .on("end",   (e, d) => { if (!e.active) simulation.alphaTarget(0); d.fx = null; d.fy = null; })
+    )
+    .on("click", (e, d) => { e.stopPropagation(); showPanel(d.data); });
+
+  node.append("circle")
+    .attr("r", 8)
+    .attr("fill", d => color(d.data.annotations.nature))
+    .attr("fill-opacity", 0.2)
+    .attr("stroke", d => color(d.data.annotations.nature));
+
+  node.append("title").text(d => `Art. ${d.id} — ${d.data.titre}`);
+
+  if (simulation) simulation.stop();
+  simulation = d3.forceSimulation(nodes)
+    .force("link", d3.forceLink(links).id(d => d.id).distance(60))
+    .force("charge", d3.forceManyBody().strength(-80))
+    .force("center", d3.forceCenter(W / 2, H / 2))
+    .force("collision", d3.forceCollide(12))
+    .on("tick", () => {
+      link.attr("x1", d => d.source.x).attr("y1", d => d.source.y)
+          .attr("x2", d => d.target.x).attr("y2", d => d.target.y);
+      node.attr("transform", d => `translate(${d.x},${d.y})`);
+    });
+
+  svg.on("click", () => {
+    document.getElementById("pbody").innerHTML = '<p class="panel-empty">Cliquez sur un nœud.</p>';
+  });
+}
+
+buildLegend();
+buildFilters();
+
+document.getElementById("article-search").addEventListener("input", event => {
+  if (!DATA) return;
+  const query = event.target.value.trim().toLocaleLowerCase();
+  const filtered = DATA.articles.filter(article =>
+    String(article.numero).includes(query) ||
+    article.titre.toLocaleLowerCase().includes(query) ||
+    (article.texte_brut || "").toLocaleLowerCase().includes(query)
+  );
+  renderArticleList(filtered);
+});
+
+function setView(view) {
+  document.body.classList.toggle("view-graph", view === "graph");
+  document.body.classList.toggle("view-reader", view === "reader");
+  document.getElementById("reader-view-button").classList.toggle("active", view === "reader");
+  document.getElementById("graph-view-button").classList.toggle("active", view === "graph");
+}
+
+document.getElementById("reader-view-button").addEventListener("click", () => setView("reader"));
+document.getElementById("graph-view-button").addEventListener("click", () => setView("graph"));
+
+function initializeData(data) {
+  if (!data || !Array.isArray(data.articles)) {
+    throw new Error("Le fichier sélectionné ne contient pas de liste d'articles.");
+  }
+  DATA = data;
+  setFiltersEnabled(true);
+  document.getElementById("hcount").textContent = `${data.articles.length} articles · 9 catégories`;
+  render(data.articles);
+}
+
+function showLoadError(message) {
+  document.getElementById("pbody").innerHTML = `
+    <p style="color:#f85149;font-size:12px;line-height:1.8">
+      Erreur de chargement :<br><code>${escapeHtml(message)}</code>
+    </p>
+    <p style="color:var(--muted);font-size:11px;line-height:1.6;margin-top:12px">
+      En ouverture locale, votre navigateur bloque parfois la lecture automatique du JSON.
+    </p>
+    <button id="json-picker-button" class="chip" style="margin-top:8px;color:var(--text)">
+      Choisir le fichier JSON
+    </button>
+    <input id="json-picker" type="file" accept=".json,application/json" hidden>
+  `;
+
+  const picker = document.getElementById("json-picker");
+  document.getElementById("json-picker-button").addEventListener("click", () => picker.click());
+  picker.addEventListener("change", async () => {
+    const [file] = picker.files;
+    if (!file) return;
+    try {
+      initializeData(JSON.parse(await file.text()));
+    } catch (error) {
+      showLoadError(error.message || "Impossible de lire le fichier JSON.");
+    }
+  });
+}
+
+fetch(JSON_PATH)
+  .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status} — ${JSON_PATH}`); return r.json(); })
+  .then(initializeData)
+  .catch(err => showLoadError(err.message));
+</script>
+</body>
+</html>
